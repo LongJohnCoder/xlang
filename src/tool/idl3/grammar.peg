@@ -1,20 +1,25 @@
 # Parsing Expression Grammars homepage: http://bford.info/packrat/
 # PEG VSCode Extension: https://marketplace.visualstudio.com/items?itemName=theaustinseven.pegs
+# MIDL3 Docs: https://docs.microsoft.com/en-us/uwp/midl-3/
 
 # Note, this grammar is incomplete
 
 # Hierarchical syntax
+
 Grammar <- Spacing Namespace+ EndOfFile
-Namespace <- NAMESPACE Identifier ('.' Identifier)* OPEN_CURLY (Namespace / Definition)* CLOSE_CURLY
+Namespace <- NAMESPACE DottedIdentifier OPEN_CURLY (Namespace / TypeDefinition)* CLOSE_CURLY
 
-Definition <- Delegate / Enum / Interface / RuntimeClass / Struct
+TypeDefinition <- Attribute / Delegate / Enum / Interface / RuntimeClass / Struct
 
+Attribute <- ATTRIBUTE Identifier OPEN_CURLY CLOSE_CURLY
 Delegate <- DELEGATE TypeName Identifier OPEN_PAREN Parameters CLOSE_PAREN SEMICOLON
 Enum <- ENUM Identifier OPEN_CURLY EnumFields CLOSE_CURLY SEMICOLON
 Interface <- INTERFACE Identifier OPEN_CURLY CLOSE_CURLY 
 RuntimeClass <- RUNTIME_CLASS Identifier OPEN_CURLY CLOSE_CURLY 
 Struct <- STRUCT Identifier OPEN_CURLY StructFields CLOSE_CURLY SEMICOLON
 
+EnumFields <- EnumField (COMMA EnumField)*
+EnumField <- Identifier (EQUAL IntConstant)?
 Parameters <- Parameter (COMMA Parameter)*
 Parameter <- TypeName Identifier
 StructFields <- StructField+
@@ -59,8 +64,11 @@ CLOSE_SQUARE <- ']' Spacing
 COMMA <- ',' Spacing 
 SEMICOLON <- ';' Spacing 
 PERIOD <- '.' Spacing
+EQUAL <- "=" Spacing
 
+IntConstant <- '-'? [0-9]+ / '0x' [0-9A-Fa-f]+ 
 TypeName <- Identifier
+DottedIdentifier <- Identifier ('.' Identifier)*
 Identifier <- IdentStart IdentCont* Spacing 
 IdentStart <- [a-zA-Z_] 
 IdentCont <- IdentStart / [0-9]
