@@ -33,18 +33,31 @@ namespace hello
     };
 }
 
-namespace foo
+namespace xlangidl
 {
     using namespace tao::pegtl;
 
-    struct A : one<'A'> { };
-    struct B : one<'B'> { };
+    struct ws : one< ' ', '\t', '\n', '\r' > {};
 
+    template< typename R, typename P = ws >
+    struct padr : seq< R, star< P > > {};
 
-    struct comp : seq<plus<sor<seq<A, B>, A>>, eof> { };
+    struct open_curly : padr< one< '{' > > {};
+    struct close_curly : padr< one< '}' > > {};
 
-    template< typename Rule >
-    struct test_action : nothing< Rule > {};
+    struct dotted_identifier : seq< identifier, star< seq< one<'.'>, identifier >>> {};
+    struct namespaceKW : string< 'n', 'a', 'm', 'e', 's', 'p', 'a', 'c', 'e' > {};
+
+    struct namespace_ : seq< namespaceKW, plus<ws>, padr<dotted_identifier>, open_curly, close_curly> {};
+
+    // struct grammar : seq< star< ws >, namespaceKW, plus<ws>, padr<identifier>, open_curly, close_curly, eof >{};
+    struct grammar : seq< star< ws >, plus<namespace_>, eof >{};
+
+    template< typename Rule > struct selector : std::false_type {};
+    template<> struct selector< grammar > : std::true_type {};
+    template<> struct selector< namespace_ > : std::true_type {};
+    template<> struct selector< identifier > : std::true_type {};
+
 }
 
 void print_node(writer& w, const tao::pegtl::parse_tree::node& n, const std::string& s = "" )
@@ -75,15 +88,23 @@ int main(int const /*argc*/, char** /*argv*/)
 {
     using namespace tao::pegtl;
 
-    string_input<> in("Hello, xlang!", "");
-
     // auto root = parse_tree::parse<foo::comp>(memory_input("AAB", ""));
-    auto root = parse_tree::parse<hello::grammar>(in);
+    // auto hello_root = parse_tree::parse<hello::grammar>(memory_input("hello, xlang!", ""));
+
+    string_input<> in("   namespace xlang  { } namespace Windows.Foundation  { }  ", "");
+    auto root = parse_tree::parse<xlangidl::grammar, xlangidl::selector>(in);
 
     // std::string name;
     // parse<hello::grammar, hello::action>(in, name);
 
     writer w;
-    print_node(w, *root);
+    if (root)
+    {
+        print_node(w, *root);
+    }
+    else
+    {
+        w.write("fail\n");
+    }
     w.flush_to_console();
 }
