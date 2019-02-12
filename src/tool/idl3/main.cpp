@@ -1,19 +1,26 @@
 #include "pch.h"
+#include <tao/pegtl/contrib/parse_tree.hpp>
 
 struct writer : xlang::text::writer_base<writer>
 {
-};
+    using writer_base<writer>::write;
 
-namespace pegtl = tao::TAO_PEGTL_NAMESPACE;
+    void write(tao::pegtl::position const& position)
+    {
+        write(tao::pegtl::to_string(position));
+    }
+};
 
 namespace hello
 {
-    struct prefix : pegtl::string<'H', 'e', 'l', 'l', 'o',',',' '>{};
-    struct name : pegtl::plus<pegtl::alpha>{};
-    struct grammar : pegtl::must<prefix, name, pegtl::one<'!'>, pegtl::eof>{};
+    using namespace tao::pegtl;
+
+    struct prefix : string<'H', 'e', 'l', 'l', 'o',',',' '>{};
+    struct name : plus<alpha>{};
+    struct grammar : must<prefix, name, one<'!'>, eof>{};
 
     template<typename Rule>
-    struct action : pegtl::nothing<Rule>{};
+    struct action : nothing<Rule>{};
 
     template<>
     struct action<name>
@@ -26,43 +33,57 @@ namespace hello
     };
 }
 
-namespace idl3
+namespace foo
 {
-    struct ws : pegtl::one< ' ', '\t', '\n', '\r' > {};
+    using namespace tao::pegtl;
 
-    template< typename R, typename P = ws >
-    struct padr : internal::seq< R, internal::star< P > > {};
+    struct A : one<'A'> { };
+    struct B : one<'B'> { };
 
-    struct NAMESPACE : pegtl::keyword<'n','a','m','e','s','p','a','c','e'>{};
 
-    struct OPEN_CURLY : padr<pegtl::one<'{'>>{};
-    struct CLOSE_CURLY : padr<pegtl::one<'}'>>{};
+    struct comp : seq<plus<sor<seq<A, B>, A>>, eof> { };
 
-    struct namespace_ : pegtl::seq<NAMESPACE, pegtl::identifier, OPEN_CURLY, CLOSE_CURLY>{};
-    struct grammar : pegtl::must<pegtl::star<ws>, pegtl::plus<namespace_>, pegtl::eof>{}; 
+    template< typename Rule >
+    struct test_action : nothing< Rule > {};
+}
 
-    template<typename Rule>
-    struct action : pegtl::nothing<Rule>{};
-
-    template<>
-    struct action<pegtl::identifier>
-    {
-        template<typename Input>
-        static void apply(Input const& in, std::string& v)
+void print_node(writer& w, const tao::pegtl::parse_tree::node& n, const std::string& s = "" )
+{
+    // detect the root node:
+    if( n.is_root() ) {
+        w.write("ROOT\n");
+    }
+    else {
+        if( n.has_content() ) 
         {
-            v = in.string();
+            w.write("%% \"%\" at % to %\n", s, n.name(), n.content(), n.begin(), n.end());
         }
-    };
+        else {
+            w.write("%% at %\n", s, n.name(),n.begin());
+        }
+    }
+    // print all child nodes
+    if( !n.children.empty() ) {
+        const auto s2 = s + "  ";
+        for( auto& up : n.children ) {
+        print_node(w, *up, s2 );
+        }
+    }
 }
 
 int main(int const /*argc*/, char** /*argv*/)
 {
-    pegtl::string_input<> in("namespace ATest {}", "from_content");
+    using namespace tao::pegtl;
 
-    std::string name;
-    pegtl::parse<hello::grammar, hello::action>(in, name);
+    string_input<> in("Hello, xlang!", "");
+
+    // auto root = parse_tree::parse<foo::comp>(memory_input("AAB", ""));
+    auto root = parse_tree::parse<hello::grammar>(in);
+
+    // std::string name;
+    // parse<hello::grammar, hello::action>(in, name);
 
     writer w;
-    w.write("Good bye, %!\n", name);
+    print_node(w, *root);
     w.flush_to_console();
 }
