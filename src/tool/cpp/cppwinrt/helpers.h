@@ -117,7 +117,7 @@ namespace xlang
 
         if (impls.first != impls.second)
         {
-            throw_invalid("Type '", type.TypeNamespace(), ".", type.TypeName(), "' does not have a default interface");
+            return impls.first.Interface();
         }
 
         return {};
@@ -164,7 +164,7 @@ namespace xlang
 
     static bool is_noexcept(MethodDef const& method)
     {
-        return is_remove_overload(method) || has_attribute(method, "Windows.Foundation.Metadata", "NoExceptAttribute");
+        return is_remove_overload(method) || has_attribute(method, "Windows.Foundation.Metadata", "NoExceptionAttribute");
     }
 
     static bool is_async(MethodDef const& method, method_signature const& method_signature)

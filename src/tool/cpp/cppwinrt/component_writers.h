@@ -57,7 +57,7 @@ namespace xlang
             if (first)
             {
                 first = false;
-                w.write(",\n    impl::base<D");
+                w.write(",\n        impl::base<D");
             }
 
             w.write(", %", base);
@@ -136,8 +136,8 @@ namespace xlang
 
     static void write_module_g_cpp(writer& w, std::vector<TypeDef> const& classes)
     {
-        auto format = R"(#include "winrt/base.h"
-%
+        w.write_root_include("base");
+        auto format = R"(%
 bool WINRT_CALL %_can_unload_now() noexcept
 {
     if (winrt::get_module_lock())
@@ -381,8 +381,7 @@ int32_t WINRT_CALL WINRT_GetActivationFactory(void* classId, void** factory) noe
 
         if (has_factory_members(w, type))
         {
-            auto format = R"(
-void* winrt_make_%()
+            auto format = R"(void* winrt_make_%()
 {
     return winrt::detach_abi(winrt::make<winrt::@::factory_implementation::%>());
 }
@@ -562,7 +561,7 @@ void* winrt_make_%()
                 {
                     format = R"(    % %::%(%) const noexcept
     {
-        return get_self<@::implementation::%>(*this)->%(%);
+        %get_self<@::implementation::%>(*this)->%(%);
     }
 )";
                 }
@@ -570,7 +569,7 @@ void* winrt_make_%()
                 {
                     format = R"(    % %::%(%) const
     {
-        return get_self<@::implementation::%>(*this)->%(%);
+        %get_self<@::implementation::%>(*this)->%(%);
     }
 )";
                 }
@@ -580,6 +579,7 @@ void* winrt_make_%()
                     type_name,
                     method_name,
                     bind<write_consume_params>(signature),
+                    signature.return_signature() ? "return " : "",
                     type_namespace,
                     type_name,
                     method_name,
@@ -599,6 +599,7 @@ void* winrt_make_%()
                         type_name,
                         method_name,
                         bind<write_consume_params>(signature),
+                        type_name,
                         method_name,
                         method_name,
                         bind<write_consume_args>(signature));
@@ -672,12 +673,11 @@ void* winrt_make_%()
                 auto& params = signature.params();
                 params.resize(params.size() - 2);
 
-                auto format = R"(
-    %_base(%)
-    {
-        impl::call_factory<%, %>([&](auto&& f) { f.%(%%*this, this->m_inner); });
-    }
-                )";
+                auto format = R"(        %_base(%)
+        {
+            impl::call_factory<%, %>([&](auto&& f) { f.%(%%*this, this->m_inner); });
+        }
+)";
 
                 w.write(format,
                     type_name,
@@ -715,12 +715,11 @@ void* winrt_make_%()
         {
             return { to_abi<default_interface<class_type>>(this) };
         }
-
         hstring GetRuntimeClassName() const
         {
             return L"%.%";
         }
-    %%};
+%%    };
 }
 )";
 
@@ -729,15 +728,39 @@ void* winrt_make_%()
             std::string base_type_parameter;
             std::string base_type_argument;
             std::string no_module_lock;
-            bool external_base_type{};
+            std::string external_requires;
 
             if (base_type)
             {
-                external_base_type = !settings.filter.includes(base_type);
+                bool const external_base_type = !settings.filter.includes(base_type);
 
                 if (external_base_type)
                 {
                     composable_base_name = w.write_temp("using composable_base = %;", base_type);
+                    auto base_interfaces = get_interfaces(w, base_type);
+                    uint32_t base_interfaces_count{};
+                    external_requires = ",\n        impl::require<D";
+
+                    for (auto&&[name, info] : base_interfaces)
+                    {
+                        if (info.overridable)
+                        {
+                            continue;
+                        }
+
+                        ++base_interfaces_count;
+                        external_requires += ", ";
+                        external_requires += name;
+                    }
+
+                    if (base_interfaces_count)
+                    {
+                        external_requires += '>';
+                    }
+                    else
+                    {
+                        external_requires.clear();
+                    }
                 }
                 else
                 {
@@ -754,7 +777,7 @@ void* winrt_make_%()
                 bind<write_component_interfaces>(type),
                 base_type_argument,
                 no_module_lock,
-                "",
+                external_requires,
                 bind<write_component_class_base>(type),
                 bind<write_component_override_defaults>(type),
                 type_name,
@@ -1061,15 +1084,30 @@ namespace winrt::@::implementation
 
     static void write_component_cpp(writer& w, TypeDef const& type)
     {
-        auto format = R"(#include "%.h"
+        auto filename = get_component_filename(type);
 
+        {
+            auto format = R"(#include "%.h"
+)";
+
+            w.write(format, filename);
+        }
+
+        if (settings.component_opt)
+        {
+            auto format = R"(#include "%.g.cpp"
+)";
+
+            w.write(format, filename);
+        }
+
+        auto format = R"(
 namespace winrt::@::implementation
 {
 %}
 )";
 
         w.write(format,
-            get_component_filename(type),
             type.TypeNamespace(),
             bind<write_component_member_definitions>(type));
     }

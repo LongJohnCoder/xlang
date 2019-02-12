@@ -31,6 +31,35 @@ class TestJson(unittest.TestCase):
         with self.assertRaises(TypeError):
             v = wdj.JsonValue()
 
+    def test_JsonArray_iter(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+        count = 0
+        for x in a:
+            count = count + 1
+        self.assertEqual(a.Size, count)
+
+    def test_JsonArray_len(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+        self.assertEqual(a.Size, len(a))
+
+    def test_JsonArray_get_item(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+        self.assertTrue(a[0].GetBoolean())
+        self.assertFalse(a[1].GetBoolean())
+        self.assertEqual(42, a[2].GetNumber())
+        self.assertEqual(0, a[3].ValueType) # JsonValueType.Null
+        self.assertEqual(4, a[4].ValueType) # JsonValueType.Array
+        self.assertEqual(5, a[5].ValueType) # JsonValueType.Object
+        self.assertEqual("plugh", a[6].GetString())
+
+    def test_JsonArray_set_item(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+
+        self.assertEqual(0, a[3].ValueType) # JsonValueType.Null
+        a[3] = wdj.JsonValue.CreateNumberValue(3.14)
+        self.assertEqual(2, a[3].ValueType) # JsonValueType.Number
+        self.assertEqual(3.14, a[3].GetNumber())
+
     def test_JsonArray_parse(self):
         a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
         self.assertEqual(a.ValueType, 4)
@@ -67,6 +96,22 @@ class TestJson(unittest.TestCase):
         o5 = v5.GetObject()
         self.assertEqual(o5.Size, 0)
 
+    def test_JsonObject_len(self):
+        o = wdj.JsonObject.Parse('{ "king": "Arthur", "count": 3, "squire": "Patsy", "knights": ["Bedevere", "Lancelot", "Galahad", "Robin"]}')
+        self.assertEqual(o.Size, len(o))
+
+    def test_JsonObject_get_item(self):
+        o = wdj.JsonObject.Parse('{ "king": "Arthur", "count": 3, "squire": "Patsy", "knights": ["Bedevere", "Lancelot", "Galahad", "Robin"]}')
+        self.assertEqual(3, o["count"].GetNumber())
+        self.assertEqual("Arthur", o["king"].GetString())
+        self.assertEqual("Patsy", o["squire"].GetString())
+        self.assertEqual(4, o["knights"].ValueType)
+
+    def test_JsonObject_set_item(self):
+        o = wdj.JsonObject.Parse('{ "king": "Arthur", "count": 3, "squire": "Patsy", "knights": ["Bedevere", "Lancelot", "Galahad", "Robin"]}')
+        self.assertEqual(4, o.Size)
+        o["camelot"] =  wdj.JsonValue.CreateStringValue("a silly place")
+        self.assertEqual(5, o.Size)
 
     def test_JsonValue_boolean(self):
         t = wdj.JsonValue.CreateBooleanValue(True)
@@ -112,6 +157,34 @@ class TestJson(unittest.TestCase):
     def test_invalid_param_count_static(self):
         with self.assertRaises(TypeError):
             wdj.JsonArray.Parse(10, 20)
+
+    def test_JsonArray_GetMany(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+        count, items = a.GetMany(1, 3)
+
+        self.assertEqual(count, 3)
+        self.assertEqual(len(items), 3)
+
+        self.assertFalse(items[0].GetBoolean())
+        self.assertEqual(items[1].GetNumber(), 42)
+        self.assertEqual(items[2].ValueType, 0)
+
+        # TODO: remove clear call after resolving leak issue
+        items.clear()
+
+    def test_JsonArray_GetMany2(self):
+        a = wdj.JsonArray.Parse('[true, false, 42, null, [], {}, "plugh"]')
+        count, items = a.GetMany(6, 3)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(items), 3)
+
+        self.assertEqual(items[0].GetString(), "plugh")
+        self.assertIsNone(items[1])
+        self.assertIsNone(items[2])
+
+        # TODO: remove clear call after resolving leak issue
+        items.clear()
 
 
 if __name__ == '__main__':
