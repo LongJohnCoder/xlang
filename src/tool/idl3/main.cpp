@@ -37,21 +37,23 @@ namespace xlangidl
 {
     using namespace tao::pegtl;
 
-    struct ws : one< ' ', '\t', '\n', '\r' > {};
-
-    template< typename R, typename P = ws >
+    template< typename R, typename P = space >
     struct padr : seq< R, star< P > > {};
 
     struct open_curly : padr< one< '{' > > {};
     struct close_curly : padr< one< '}' > > {};
 
     struct dotted_identifier : seq< identifier, star< seq< one<'.'>, identifier >>> {};
-    struct namespaceKW : string< 'n', 'a', 'm', 'e', 's', 'p', 'a', 'c', 'e' > {};
 
-    struct namespace_ : seq< namespaceKW, plus<ws>, padr<dotted_identifier>, open_curly, close_curly> {};
+    struct namespace_ : seq< 
+        string< 'n', 'a', 'm', 'e', 's', 'p', 'a', 'c', 'e' >, 
+        plus<space>, 
+        padr<dotted_identifier>, 
+        open_curly, 
+        close_curly> {};
 
-    // struct grammar : seq< star< ws >, namespaceKW, plus<ws>, padr<identifier>, open_curly, close_curly, eof >{};
-    struct grammar : seq< star< ws >, plus<namespace_>, eof >{};
+    struct something : sor< space, namespace_ > {};
+    struct grammar : until< eof, must< something > >{};
 
     template< typename Rule > struct selector : std::false_type {};
     template<> struct selector< grammar > : std::true_type {};
