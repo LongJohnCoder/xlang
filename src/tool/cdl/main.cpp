@@ -356,6 +356,168 @@ namespace cdl
         peg::string< '>', '>' >,
         peg::one< '>' > > {};
 
+    // 2.5 Pre_processing directives
+    // TBD
+
+    // 3.6 Namespace and type names
+    struct type_argument_list;
+    struct qualified_alias_member;
+    struct namespace_or_type_name : peg::sor< 
+        peg::seq<
+            peg::list< 
+                identifier, 
+                peg::one< '.' > >, 
+            type_argument_list >,
+         qualified_alias_member > {};
+    struct type_name : peg::seq< namespace_or_type_name > {};
+    struct namespace_name : peg::seq< namespace_or_type_name > {};
+
+    // 4. Types
+    struct value_type;
+    struct reference_type;
+    struct type_parameter;
+    struct type : peg::sor< 
+        value_type, 
+        reference_type, 
+        type_parameter > {};
+
+    // 4.1 Value types
+    struct integral_type : peg::sor< 
+        peg::string< 'C', 'h', 'a', 'r' >, 
+        peg::string< 'I', 'n', 't', '8' >, 
+        peg::string< 'I', 'n', 't', '1', '6' >, 
+        peg::string< 'I', 'n', 't', '3', '2' >, 
+        peg::string< 'I', 'n', 't', '6', '4' >, 
+        peg::string< 'U', 'I', 'n', 't', '8' >, 
+        peg::string< 'U', 'I', 'n', 't', '1', '6' >, 
+        peg::string< 'U', 'I', 'n', 't', '3', '2' >, 
+        peg::string< 'U', 'I', 'n', 't', '6', '4' > > {};
+    struct floating_point_type : peg::sor< 
+        peg::string< 'S', 'i', 'n', 'g', 'l', 'e' >, 
+        peg::string< 'D', 'o', 'u', 'b', 'l', 'e' > > {};
+    struct numeric_type : peg::sor< 
+        integral_type, 
+        floating_point_type > {};
+    struct simple_type : peg::sor< 
+        numeric_type, 
+        peg::string< 'B', 'o', 'o', 'l', 'e', 'a', 'n' > > {}; 
+    struct non_nullable_value_type : peg::seq< type > {};
+    struct nullable_type : peg::seq< 
+        non_nullable_value_type, 
+        peg::one< '?' > > {};
+    struct struct_type : peg::sor< 
+        type_name, 
+        simple_type,
+        nullable_type> {}; 
+    struct enum_type : peg::seq< type > {};
+    struct value_type : peg::sor< 
+        struct_type, 
+        enum_type> {}; 
+
+    // 4.2 Reference types
+    struct class_type : peg::sor< 
+        type_name, 
+        peg::string< 'O', 'b', 'j', 'e', 'c', 't' > > {};
+    struct interface_type : peg::seq< type_name > {};
+    struct delegate_type : peg::seq< type_name > {};
+    struct non_array_type : peg::seq< type > {};
+    struct rank_specifier : peg::seq<
+        peg::one< '[' >,
+        peg::one< ']' > > {};
+    struct array_type : peg::seq< 
+        non_array_type,
+        rank_specifier > {};
+    struct reference_type : peg::sor< 
+        class_type, 
+        interface_type, 
+        array_type, 
+        delegate_type > {};
+
+    // 4.3.1 Type arguments
+    struct type_argument : peg::seq< type > {};
+    struct type_arguments : peg::list< type_argument, peg::one< ',' >> {};
+    struct type_argument_list : peg::seq< 
+        peg::one< '<' >, 
+        type_arguments, 
+        peg::one< '>' > > {};
+
+    // 4.4 Type parameters
+    struct type_parameter : peg::seq< identifier > {};
+
+    // 5.2 Primary expressions
+    // TBD
+
+    // 6.1 Compilation units
+    struct using_directives;
+    struct global_attributes;
+    struct namespace_member_declarations;
+    struct compilation_unit : peg::seq< 
+        peg::opt< using_directives >, 
+        // peg::opt< global_attributes >,  I think this is missing from the text
+        peg::opt< namespace_member_declarations > > {};
+
+    // 6.2 Namespace declarations
+    struct qualified_identifier : peg::list< identifier, peg::one< '.' > > {};
+    struct namespace_body : peg::seq< 
+        peg::one< '{' >, 
+        peg::opt< using_directives >, 
+        peg::opt< namespace_member_declarations >, 
+        peg::one< '}' > > {};
+    struct namespace_declaration : peg::seq< 
+        peg::string< 'n', 'a', 'm', 'e', 's', 'p', 'a', 'c', 'e' >, 
+        qualified_identifier, 
+        namespace_body, 
+        peg::opt< peg::one< ';' > > > {};
+
+    // 6.3 Using directives
+    struct using_alias_directive;
+    struct using_namespace_directive;
+    struct using_directive : peg::sor< 
+        using_alias_directive, 
+        using_namespace_directive > {};
+    struct using_directives : peg::plus< using_directive > {};
+
+    // 6.3.1 Using alias directives
+    struct using_alias_directive : peg::seq< 
+        peg::string< 'u', 's', 'i', 'n', 'g' >, 
+        identifier, 
+        peg::one< '=' >, 
+        namespace_or_type_name, 
+        peg::one< ';' > > {};
+
+    // 6.3.2 Using namespace directives
+    struct using_namespace_directive : peg::seq< 
+        peg::string< 'u', 's', 'i', 'n', 'g' >, 
+        namespace_name, 
+        peg::one< ';' > > {};
+
+    // 6.4 Namespace members
+    struct type_declaration;
+    struct namespace_member_declaration : peg::sor< 
+        namespace_declaration, 
+        type_declaration > {};
+    struct namespace_member_declarations : peg::plus< namespace_member_declaration > {};
+
+    // 6.5 Type declarations
+    struct class_declaration;
+    struct struct_declaration;
+    struct interface_declaration;
+    struct enum_declaration;
+    struct delegate_declaration;
+    struct type_declaration : peg::sor< 
+        class_declaration, 
+        struct_declaration, 
+        interface_declaration, 
+        enum_declaration, 
+        delegate_declaration > {};
+
+    // 6.6 Namespace alias qualifiers
+    struct qualified_alias_member : peg::seq< 
+        identifier, 
+        peg::string< ':', ':' >, 
+        identifier, 
+        peg::opt< type_argument_list > > {};
+
     template< typename Rule > struct selector : std::false_type {};
     template<> struct selector< comment > : std::true_type {};
     template<> struct selector< identifier > : std::true_type {};
