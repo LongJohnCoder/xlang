@@ -65,10 +65,43 @@ namespace xlangidl
 
 namespace cdl
 {
+    // http://bford.info/packrat/
+    // https://github.com/taocpp/PEGTL
+    
     namespace peg = tao::pegtl;
 
+    // 1. Introduction
+    //    This section is an intro to the type system.
+
+    // 2. Lexical structure
+    // 2.1 Declaration
+    // 2.2 Grammars
+    // 2.3 Lexical analysis
+    //     Note, this grammar is written with the assumption of being implemented with
+    //     seperate lexing and parsing steps. This will need to change in order to be 
+    //     implemented as a recursive decent parser.
+    struct new_line;
+    struct pp_directive;
+    struct whitespace;
+    struct comment;
+    struct token;
+
+    struct input_element : peg::sor<
+        whitespace,
+        comment,
+        token > {};
+    struct input_elements : peg::plus< input_element > {};
+    struct input_section_part : peg::sor< 
+        peg::seq< 
+            peg::opt< input_elements >, 
+            peg::eol >, // Note see 2.3.1 below regarding line termination 
+        pp_directive > {};
+    struct input_section : peg::plus< input_section_part > {};
+    struct input : peg::opt< input_section > {};
+
     // 2.3.1 Line terminators
-    // use peg::eol
+    //       Note, Spec calls for multiple line terminators, but PEGTL appears to handle
+    //       line termination as part of the input class so simply use peg::eol instead of new_line
 
     // 2.3.2 Comments
     struct single_line_comment : peg::seq< 
@@ -82,7 +115,13 @@ namespace cdl
         delimited_comment > {}; 
 
     // 2.3.3 White space
-    // use peg::blank
+    //       Note, spec calls for all of Zs unicode class to be included in whitespace
+    //       For now, explicitly referencing space character an ignoring the rest of Zs
+    struct whitespace : peg::sor<
+        peg::one< ' ' >, // TODO: all of Zs unicode class
+        peg::one< '\u0009' >,
+        peg::one< '\u000B' >,
+        peg::one< '\u000C' > > {};
 
     // 2.4 Tokens
     struct identifier;
@@ -105,38 +144,39 @@ namespace cdl
     struct unicode_escape_sequence : peg::sor< 
         peg::seq< 
             peg::string< '\\', 'u' >, 
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit >,
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit >,
         peg::seq< 
             peg::string< '\\', 'U' >, 
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit,
-            peg::xdigit > > {};
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit,
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit > > {};
 
     // 2.4.2 Identifiers
+    //       Note, spec calls for more unicode classes as valid identifier_start_character
+    //       and identifier_part_character choices. Simply using ascii (peg::alpha and peg::digit)
+    //       values for now.
     struct keyword;
+    struct letter_character : peg::seq< peg::alpha > {}; // TODO, add remaining unicode catgory values
+    struct decimal_digit_character : peg::seq< peg::digit > {}; // TODO, add remaining unicode catgory values
+    struct connecting_character : peg::one< '_' > {}; // TODO, add remaining unicode catgory values
+    struct identifier_part_character : peg::sor< // TODO, add combining-character and formatting-character
+        letter_character,
+        decimal_digit_character,
+        connecting_character > {};
+    struct identifier_part_characters : peg::plus< identifier_part_character > {};
     struct identifier_start_character : peg::sor< 
-        peg::alpha, 
+        letter_character, 
         peg::one< '_' > >{};
-    struct identifier_part_character : peg::sor< 
-        identifier_start_character, 
-        peg::digit > {};
     struct identifier_or_keyword : peg::seq< 
         identifier_start_character, 
-        peg::star< identifier_part_character > > {};
+        peg::opt< identifier_part_characters > > {};
     struct available_identifier : peg::seq<
         peg::not_at< keyword >,
         identifier_or_keyword > {};
     struct identifier : peg::sor< 
         available_identifier,
-        peg::seq< peg::one< '@' >, identifier_or_keyword > >{};
+        peg::seq< 
+            peg::one< '@' >, 
+            identifier_or_keyword > >{};
 
     // 2.4.3 Keywords
     struct keyword : peg::sor< 
@@ -165,6 +205,7 @@ namespace cdl
         peg::string< 'O', 'b', 'j', 'e', 'c', 't' >, 
         peg::string< 'o', 'u', 't' >, 
         peg::string< 'o', 'v', 'e', 'r', 'r', 'i', 'd', 'e' >, 
+        peg::string< 'p', 'a', 'r', 't', 'i', 'a', 'l' >, 
         peg::string< 'p', 'r', 'o', 't', 'e', 'c', 't', 'e', 'd' >, 
         peg::string< 'p', 'u', 'b', 'l', 'i', 'c' >, 
         peg::string< 'r', 'e', 'f' >, 
@@ -204,38 +245,35 @@ namespace cdl
         peg::string< 'f', 'a', 'l', 's', 'e' > > {};
 
     // 2.4.4.2 Integer literals
+    struct decimal_digit : peg::seq< peg::digit > {};
+    struct decimal_digits : peg::plus< decimal_digit > {};
+    struct hex_digit : peg::seq< peg::xdigit > {};
+    struct hex_digits : peg::plus< hex_digit > {};
     struct integer_type_suffix : peg::sor< 
-        peg::one< 'U' >, 
-        peg::one< 'u' >, 
-        peg::one< 'L' >, 
-        peg::one< 'l' >, 
-        peg::string< 'U', 'L' >, 
-        peg::string< 'U', 'l' >, 
-        peg::string< 'u', 'L' >, 
-        peg::string< 'u', 'l' >, 
-        peg::string< 'L', 'U' >, 
-        peg::string< 'L', 'u' >, 
-        peg::string< 'l', 'U' >, 
-        peg::string< 'l', 'u' > > {};
-    struct hex_digits : peg::plus< peg::xdigit > {};
+        peg::one< 'U' >, peg::one< 'u' >, 
+        peg::one< 'L' >, peg::one< 'l' >, 
+        peg::string< 'U', 'L' >, peg::string< 'U', 'l' >, 
+        peg::string< 'u', 'L' >, peg::string< 'u', 'l' >, 
+        peg::string< 'L', 'U' >, peg::string< 'L', 'u' >, 
+        peg::string< 'l', 'U' >, peg::string< 'l', 'u' > > {};
     struct hexadecimal_integer_literal : peg::seq<
         peg::one< '0' >,
         peg::sor< peg::one< 'x' >, peg::one< 'X' >>,
         hex_digits,
         peg::opt< integer_type_suffix > > {};
-    struct decimal_digits : peg::plus< peg::digit > {};
-    struct decimal_integer_literal : peg::seq< decimal_digits, peg::opt< integer_type_suffix > > {};
-    struct integer_literal : peg::sor< decimal_integer_literal, hexadecimal_integer_literal > {};
+    struct decimal_integer_literal : peg::seq< 
+        decimal_digits, 
+        peg::opt< integer_type_suffix > > {};
+    struct integer_literal : peg::sor< 
+        decimal_integer_literal, 
+        hexadecimal_integer_literal > {};
 
     // 2.4.4.3 Real literals
     struct real_type_suffix : peg::sor< 
-        peg::one< 'F' >, 
-        peg::one< 'f' >, 
-        peg::one< 'D' >, 
-        peg::one< 'd' > > {};
+        peg::one< 'F' >, peg::one< 'f' >, 
+        peg::one< 'D' >, peg::one< 'd' > > {};
     struct sign : peg::sor< 
-        peg::one< '+' >, 
-        peg::one< '-' > > {};
+        peg::one< '+' >, peg::one< '-' > > {};
     struct exponent_part : peg::seq< 
         peg::sor< peg::one< 'e' >,  peg::one< 'E' > >,
         peg::opt< sign >,
@@ -263,10 +301,10 @@ namespace cdl
     // 2.4.4.4 Character literals
     struct hexadecimal_escape_sequence : peg::seq< 
         peg::string< '\\', 'x' >, 
-        peg::xdigit, 
-        peg::opt< peg::xdigit >, 
-        peg::opt< peg::xdigit >, 
-        peg::opt< peg::xdigit > > {};
+        hex_digit, 
+        peg::opt< hex_digit >, 
+        peg::opt< hex_digit >, 
+        peg::opt< hex_digit > > {};
     struct simple_escape_sequence : peg::sor< 
         peg::string< '\\', '\'' >, 
         peg::string< '\\', '"' >, 
@@ -330,6 +368,8 @@ namespace cdl
     struct null_literal : peg::string< 'n', 'u', 'l', 'l' > {};
 
     // 2.4.5 Operators and punctuators
+    //       note, angle bracket operators will likely need special handling
+    //       to support usage as both shift operators and type param markers 
     struct operator_or_punctuator : peg::sor< 
         peg::one< '{' >, peg::one< '}' >, 
         peg::one< '[' >, peg::one< ']' >, 
@@ -357,9 +397,19 @@ namespace cdl
         peg::one< '>' > > {};
 
     // 2.5 Pre_processing directives
-    // TBD
+    //     Note, skipping PP rules for now
+
+    // 3. Basic concepts
+    // 3.1 Declarations
+    // 3.2 Members
+    // 3.3 Member access
+    // 3.4 Signatures and overloading
+    // 3.5 Scopes
+    //     Overview of the CDL file layout 
 
     // 3.6 Namespace and type names
+    //     Note, namespaces are not allowed to have type arguments, so perhaps 
+    //     type_name and namespace_name should be 
     struct type_argument_list;
     struct qualified_alias_member;
     struct namespace_or_type_name : peg::sor< 
@@ -517,6 +567,60 @@ namespace cdl
         peg::string< ':', ':' >, 
         identifier, 
         peg::opt< type_argument_list > > {};
+
+    // 7.1 Class declarations
+    struct class_declaration;
+
+    // 7.1.1 Class modifiers
+    struct class_modifier : peg::sor< 
+        peg::string< 's', 'e', 'a', 'l', 'e', 'd' >, 
+        peg::string< 's', 't', 'a', 't', 'i', 'c' > > {};
+    struct class_modifiers : peg::plus< class_modifier > {};
+
+    // 7.1.2 Partial modifier
+
+    // 7.1.3 Type parameters 
+    // WinRT classes don't support type parameterization, so not sure why this section is here
+
+    // // 7.1.4 Class base specification
+    // struct interface_static_modifier : peg::string< 's', 't', 'a', 't', 'i', 'c' > {};
+    // struct interface_type_list : peg::sor<
+    //     peg::seq<
+    //         peg::opt< attributes >, 
+    //         peg::opt< interface_static_modifier >,
+    //         interface_type >,
+        
+ 
+
+    //     interface_type, peg::star< peg::seq< peg::one< ',' >, interface_type > > > {};
+    // struct class_base : peg::sor< 
+    //     peg::seq< 
+    //         peg::one< ':' >, 
+    //         class_type >, 
+    //     peg::seq< 
+    //         peg::one< ':' >, 
+    //         interface_type_list >, 
+    //     peg::seq< 
+    //         peg::one< ':' >, 
+    //         class_type, 
+    //         peg::one< ',' >, 
+    //         interface_type_list > > {};
+
+    // struct attributes;
+    // struct type_parameter_list;
+    // struct class_base;
+    // struct class_body;
+    // struct class_declaration : peg::seq< 
+    //     peg::opt< attributes >, 
+    //     peg::opt< class_modifiers >, 
+    //     peg::opt< peg::string< 'p', 'a', 'r', 't', 'i', 'a', 'l' > >, 
+    //     peg::string< 'c', 'l', 'a', 's', 's' >, 
+    //     identifier,
+    //     peg::opt< type_parameter_list >, 
+    //     peg::opt< class_base >, 
+    //     class_body, 
+    //     peg::opt< peg::one< ';' > > > {};
+
 
     template< typename Rule > struct selector : std::false_type {};
     template<> struct selector< comment > : std::true_type {};
