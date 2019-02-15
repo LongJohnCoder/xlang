@@ -67,7 +67,7 @@ namespace cdl
 {
     // http://bford.info/packrat/
     // https://github.com/taocpp/PEGTL
-    
+
     namespace peg = tao::pegtl;
 
     // 1. Introduction
@@ -409,7 +409,7 @@ namespace cdl
 
     // 3.6 Namespace and type names
     //     Note, namespaces are not allowed to have type arguments, so perhaps 
-    //     type_name and namespace_name should be 
+    //     type_name and namespace_name should have separate definitions?
     struct type_argument_list;
     struct qualified_alias_member;
     struct namespace_or_type_name : peg::sor< 
