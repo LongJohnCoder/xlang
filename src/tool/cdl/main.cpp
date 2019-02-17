@@ -446,6 +446,7 @@ namespace cdl
         peg::identifier > {};
 
     // 2.5.2 Pre-processing expressions
+    //       Note, reconsider seps vs ws here
     template< typename S, typename O >
     struct left_assoc : peg::seq< S, seps, peg::star_must< O, seps, S, seps > > {};
     template< typename S, typename O >
@@ -474,8 +475,66 @@ namespace cdl
     struct pp_expression : peg::pad< pp_or_expression, seps > {};
 
     // 2.5.3 Declaration directives
+    struct pp_new_line : peg::seq<
+        peg::star< peg::ascii::blank >,
+        peg::sor<
+            single_line_comment,
+            peg::eol > > {};
+
+    struct pp_declaration : peg::sor< 
+        peg::seq< 
+            peg::one< '#' >, 
+            peg::star< peg::ascii::blank >, 
+            peg::sor<
+                key_define,
+                key_undef >,
+            peg::plus< peg::ascii::blank >, 
+            conditional_symbol,
+            pp_new_line > > {}; 
 
     // 2.5.4 Conditional compilation directives
+    // struct input_section; // TODO
+    // struct skipped_section_part; // : peg::sor< peg::seq< peg::opt< skipped_characters >, new_line >, pp_directive > {};
+    // struct skipped_section : peg::star< skipped_section_part > {};
+    // struct conditional_section : peg::sor< 
+    //     input_section, 
+    //     skipped_section > {};
+    // struct pp_if_section : peg::sor< 
+    //     peg::seq< 
+    //         peg::one< '#' >, 
+    //         peg::star< peg::blanks >, 
+    //         peg::sor<
+    //             key_define,
+    //             key_undef >,
+    //         peg::plus< peg::blanks >, 
+    //         conditional_symbol,
+    //         pp_new_line > > {}; 
+
+    // struct pp_elseif_section : peg::seq< 
+    //     peg::one< '#' >, 
+    //     peg::star< peg::ascii::blanks >, 
+    //     key_elseif,
+    //     pp_new_line
+    //     peg::opt< conditional_section > > {};
+
+    // struct pp_else_section : peg::seq< 
+    //     peg::one< '#' >, 
+    //     peg::star< peg::ascii::blanks >, 
+    //     key_else,
+    //     pp_new_line
+    //     peg::opt< conditional_section > > {};
+
+    // struct pp_endif : peg::seq< 
+    //     peg::one< '#' >, 
+    //     peg::star< peg::ascii::blanks >, 
+    //     key_endif,
+    //     pp_new_line > {};
+
+    // struct pp_conditional : peg::seq< 
+    //     pp_if_section, 
+    //     peg::star< pp_elif_section >, 
+    //     peg::opt< pp_else_section >, 
+    //     pp_endif > {};
 
     // 2.5.5 Diagnostic directives
 
@@ -518,9 +577,9 @@ int main(int const /*argc*/, char** /*argv*/)
 {
     using namespace tao::pegtl;
 
-    const std::size_t issues_found = tao::pegtl::analyze< cdl::comment >();
+    // const std::size_t issues_found = tao::pegtl::analyze< cdl::comment >();
 
-    auto root = parse_tree::parse<cdl::identifier, cdl::selector>(memory_input("_namespace", ""));
+    // auto root = parse_tree::parse<cdl::identifier, cdl::selector>(memory_input("_namespace", ""));
     // auto hello_root = parse_tree::parse<hello::grammar>(memory_input("hello, xlang!", ""));
 
     // string_input<> in("   namespace xlang  { } namespace Windows.Foundation  { }  ", "");
@@ -529,14 +588,14 @@ int main(int const /*argc*/, char** /*argv*/)
     // std::string name;
     // parse<hello::grammar, hello::action>(in, name);
 
-    writer w;
-    if (root)
-    {
-        print_node(w, *root);
-    }
-    else
-    {
-        w.write("fail\n");
-    }
-    w.flush_to_console();
+    // writer w;
+    // if (root)
+    // {
+    //     print_node(w, *root);
+    // }
+    // else
+    // {
+    //     w.write("fail\n");
+    // }
+    // w.flush_to_console();
 }
