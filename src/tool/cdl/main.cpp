@@ -816,7 +816,7 @@ namespace xlang::cdl
 {
     namespace peg = tao::pegtl;
 
-    // Spacing
+    // 2.3.2 Comments
     struct single_line_comment : peg::seq< 
         peg::string< '/', '/' >, 
         peg::until< peg::eol > >  {};
@@ -826,13 +826,23 @@ namespace xlang::cdl
     struct comment : peg::sor< 
         single_line_comment, 
         delimited_comment > {}; 
-    struct spacing : peg::star<
-        peg::sor<
-            peg::blank,
-            peg::eol,
-            comment > > {};
 
-    // Identifiers
+    // 2.3.3 White space
+    struct sep : peg::sor< peg::ascii::space, comment > {};
+    struct seps : peg::star< sep > {};
+
+    // 2.4 Tokens
+    // 2.4.1 Unicode character escape sequences
+    struct unicode_escape_sequence : peg::sor< 
+        peg::seq< 
+            peg::string< '\\', 'u' >, 
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit >,
+        peg::seq< 
+            peg::string< '\\', 'U' >, 
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit,
+            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit > > {};
+
+    // 2.4.2 Identifiers
     struct keyword;
     struct identifier : peg::sor<
         peg::seq<
@@ -842,7 +852,7 @@ namespace xlang::cdl
             peg::one< '@' >,
             peg::identifier > > {};
 
-    // Keywords
+    // 2.4.3 Keywords
     struct str_abstract : TAO_PEGTL_STRING( "abstract" ){};
     struct str_add : TAO_PEGTL_STRING( "add" ){};
     struct str_assembly : TAO_PEGTL_STRING( "assembly" ){};
@@ -991,8 +1001,7 @@ namespace xlang::cdl
     template< typename Key >
     struct key : peg::seq< 
         Key, 
-        peg::not_at< peg::identifier_other >,
-        spacing > {};
+        peg::not_at< peg::identifier_other > > {};
 
     struct key_abstract : key< str_abstract > {};
     struct key_add : key< str_add > {};
@@ -1066,15 +1075,29 @@ namespace xlang::cdl
     struct key_void : key< str_void > {};
     struct key_warning : key< str_warning > {};
 
-   struct keyword : key< str_keyword > {};
+    struct keyword : key< str_keyword > {};
 
-    // Literals
+    // 2.4.4 Literals
+    struct boolean_literal;
+    struct integer_literal;
+    struct real_literal;
+    struct character_literal;
+    struct string_literal;
+    struct null_literal;
+    struct literal : peg::sor<
+        boolean_literal, 
+        integer_literal, 
+        real_literal, 
+        character_literal, 
+        string_literal, 
+        null_literal > {};
+    
+    // 2.4.4.1 Boolean Literals
     struct boolean_literal : peg::sor< 
         key_true,
         key_false > {};
 
-    struct null_literal : peg::seq< key_null > {};
-
+    // 2.4.4.2 Integer literals
     struct integer_type_suffix : peg::sor< 
         TAO_PEGTL_STRING("UL"), TAO_PEGTL_STRING("Ul"), 
         TAO_PEGTL_STRING("uL"), TAO_PEGTL_STRING("ul"), 
@@ -1095,9 +1118,9 @@ namespace xlang::cdl
             hexadecimal_integer_literal,
             binary_integer_literal,
             decimal_integer_literal >,
-        peg::opt< integer_type_suffix >,
-        spacing > {};
+        peg::opt< integer_type_suffix > > {};
 
+    // 2.4.4.3 Real literals
     struct real_type_suffix : peg::one< 'F', 'f', 'D', 'd' > {};
     struct sign : peg::one< '+', '-' > {};
     struct exponent_part : peg::seq< 
@@ -1123,17 +1146,9 @@ namespace xlang::cdl
                 peg::opt< real_type_suffix > >, 
             peg::seq< 
                 peg::plus< peg::digit >, 
-                real_type_suffix > >, 
-        spacing > {};
+                real_type_suffix > > > {};
 
-    struct unicode_escape_sequence : peg::sor< 
-        peg::seq< 
-            peg::string< '\\', 'u' >, 
-            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit >,
-        peg::seq< 
-            peg::string< '\\', 'U' >, 
-            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit,
-            peg::xdigit, peg::xdigit, peg::xdigit, peg::xdigit > > {};
+    // 2.4.4.4 Character literals
     struct hexadecimal_escape_sequence : peg::seq< 
         peg::string< '\\', 'x' >, 
         peg::xdigit, peg::opt< peg::xdigit >, peg::opt< peg::xdigit >, peg::opt< peg::xdigit > > {};
@@ -1152,9 +1167,9 @@ namespace xlang::cdl
         peg::seq< 
             peg::one< '\'' >, 
             character, 
-            peg::one< '\'' > >,
-        spacing > {};
+            peg::one< '\'' > > > {};
 
+    // 2.4.4.5 String literals
     struct single_regular_string_literal_character : peg::seq<
         peg::not_at< peg::one< '"', '\\' > >,
         peg::not_at< peg::eol >,
@@ -1180,16 +1195,12 @@ namespace xlang::cdl
     struct string_literal :  peg::seq<
         peg::sor< 
             regular_string_literal, 
-            verbatim_string_literal >,
-        spacing > {};
+            verbatim_string_literal > > {};
 
-    struct literal : peg::sor<
-        boolean_literal, 
-        integer_literal, 
-        real_literal, 
-        character_literal, 
-        string_literal, 
-        null_literal > {};
+    // 2.4.4.6 Null Literal
+    struct null_literal : peg::seq< key_null > {};
+
+    // 2.4.5 Operators and punctuators
 
 
 
