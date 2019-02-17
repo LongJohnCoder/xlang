@@ -1202,8 +1202,65 @@ namespace xlang::cdl
 
     // 2.4.5 Operators and punctuators
 
+    // 2.5 Pre-processing directives
+    struct pp_declaration;
+    struct pp_conditional;
+    struct pp_line;
+    struct pp_diagnostic;
+    struct pp_region;
+    struct pp_pragma;
+    struct pp_directive : peg::sor< 
+        pp_declaration, 
+        pp_conditional, 
+        pp_line, 
+        pp_diagnostic, 
+        pp_region, 
+        pp_pragma > {};
 
+    // 2.5.1 Conditional compilation symbols
+    struct conditional_symbol : peg::seq<
+        peg::not_at< boolean_literal >,
+        peg::identifier > {};
 
+    // 2.5.2 Pre-processing expressions
+    template< typename S, typename O >
+    struct left_assoc : peg::seq< S, seps, peg::star_must< O, seps, S, seps > > {};
+    template< typename S, typename O >
+    struct right_assoc : peg::seq< S, seps, peg::opt_must< O, seps, right_assoc< S, O > > > {};
+
+    struct pp_expression;
+    struct pp_primary_expression : peg::seq<
+        key_true,
+        key_false, 
+        conditional_symbol,
+        peg::seq<
+            peg::one< '(' >,
+            seps,
+            pp_expression,
+            seps,
+            peg::one< ')' > > > {};
+    struct pp_unary_expression : peg::seq<
+        pp_primary_expression, 
+        peg::if_must< peg::one< '!' >, seps, pp_unary_expression > > {};
+    struct pp_equality_expression : peg::sor<
+        pp_unary_expression,
+        left_assoc< pp_unary_expression, peg::string< '=', '=' > >,
+        left_assoc< pp_unary_expression, peg::string< '!', '=' > > > {};
+    struct pp_and_expression : left_assoc< pp_equality_expression, peg::string< '&', '&' > > {};
+    struct pp_or_expression : left_assoc< pp_and_expression, peg::string< '|', '|' > > {};
+    struct pp_expression : peg::pad< pp_or_expression, seps > {};
+
+    // 2.5.3 Declaration directives
+
+    // 2.5.4 Conditional compilation directives
+
+    // 2.5.5 Diagnostic directives
+
+    // 2.5.6 Region directives
+
+    // 2.5.7 Line directives
+
+    // 2.5.8 Pragma directives
 
 
 
